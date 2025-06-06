@@ -207,7 +207,7 @@
 
         // Получаем данные о товарах и пользователе
         function loadData() {
-            fetch('https://your-flask-server-url/webhook', {
+            fetch('http://172.20.10.2:5000', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -268,7 +268,7 @@
 
         // Добавление товара в корзину
         function addToCart(productId, category) {
-            fetch('https://your-flask-server-url/webhook', {
+            fetch('http://172.20.10.2:5000', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -292,7 +292,7 @@
 
         // Удаление товара из корзины
         function removeFromCart(productId) {
-            fetch('https://your-flask-server-url/webhook', {
+            fetch('http://172.20.10.2:5000', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -380,7 +380,7 @@
             }
             
             if (confirm('Оформить заказ?')) {
-                fetch('https://your-flask-server-url/webhook', {
+                fetch('http://172.20.10.2:5000', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Shop</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #0088cc;
+            color: white;
+            padding: 15px 0;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .profile-section, .orders-section, .products-section, .admin-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #0088cc;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .user-info {
+            margin-bottom: 15px;
+        }
+        .order-item, .product-item {
+            border: 1px solid #eee;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .admin-only {
+            display: none;
+        }
+        .hidden {
+            display: none;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Telegram Shop</h1>
+        </header>
+
+        <div id="loading">
+            <p>Загрузка данных...</p>
+        </div>
+
+        <div id="login-section" class="hidden">
+            <p>Откройте магазин через Telegram-бота.</p>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <div class="profile-section">
+                <h2>Профиль</h2>
+                <div class="user-info">
+                    <p><strong>ID:</strong> <span id="user-id">-</span></p>
+                    <p><strong>Username:</strong> <span id="user-username">-</span></p>
+                    <p><strong>Роль:</strong> <span id="user-role">Пользователь</span></p>
+                </div>
+            </div>
+
+            <div class="orders-section">
+                <h2>Мои заказы</h2>
+                <div id="user-orders">
+                    <p>Загрузка...</p>
+                </div>
+            </div>
+
+            <div class="products-section">
+                <h2>Товары</h2>
+                <div id="products-list">
+                    <p>Загрузка...</p>
+                </div>
+            </div>
+
+            <div id="admin-section" class="admin-section admin-only">
+                <h2>Панель администратора</h2>
+                <div id="admin-orders-list">
+                    <p>Загрузка всех заказов...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Конфигурация API бота (замените на ваш URL)
+        const BOT_API_URL = "https://your-server.com/bot-api";
+
+        let tgUser = null;
+        let isAdmin = false;
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.Telegram?.WebApp) {
+                await initTelegramWebApp();
+            } else {
+                showLoginScreen();
+            }
+        });
+
+        // Инициализация Telegram WebApp
+        async function initTelegramWebApp() {
+            Telegram.WebApp.ready();
+            tgUser = Telegram.WebApp.initDataUnsafe?.user;
+
+            if (!tgUser) {
+                showLoginScreen();
+                return;
+            }
+
+            // Проверяем, админ ли пользователь
+            isAdmin = await checkAdminStatus(tgUser.id);
+            
+            // Загружаем данные
+            await loadData();
+            
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+        }
+
+        // Проверка прав администратора
+        async function checkAdminStatus(userId) {
+            try {
+                const response = await fetch(`${BOT_API_URL}/is_admin?user_id=${userId}`);
+                const data = await response.json();
+                return data.is_admin;
+            } catch (error) {
+                console.error("Ошибка проверки админа:", error);
+                return false;
+            }
+        }
+
+        // Загрузка товаров и заказов
+        async function loadData() {
+            await loadProducts();
+            await loadUserOrders();
+            
+            if (isAdmin) {
+                await loadAllOrders();
+                document.getElementById('admin-section').style.display = 'block';
+            }
+        }
+
+        // Загрузка товаров
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${BOT_API_URL}/products`);
+                const products = await response.json();
+                displayProducts(products);
+            } catch (error) {
+                document.getElementById('products-list').innerHTML = "Ошибка загрузки товаров.";
+            }
+        }
+
+        // Загрузка заказов пользователя
+        async function loadUserOrders() {
+            try {
+                const response = await fetch(`${BOT_API_URL}/orders?user_id=${tgUser.id}`);
+                const orders = await response.json();
+                displayUserOrders(orders);
+            } catch (error) {
+                document.getElementById('user-orders').innerHTML = "Ошибка загрузки заказов.";
+            }
+        }
+
+        // Загрузка всех заказов (для админа)
+        async function loadAllOrders() {
+            try {
+                const response = await fetch(`${BOT_API_URL}/all_orders`);
+                const orders = await response.json();
+                displayAllOrders(orders);
+            } catch (error) {
+                document.getElementById('admin-orders-list').innerHTML = "Ошибка загрузки заказов.";
+            }
+        }
+
+        // Отображение данных
+        function displayUserInfo() {
+            document.getElementById('user-id').textContent = tgUser.id;
+            document.getElementById('user-username').textContent = tgUser.username || "Не указан";
+            document.getElementById('user-role').textContent = isAdmin ? "Администратор" : "Пользователь";
+        }
+
+        function displayProducts(products) {
+            const container = document.getElementById('products-list');
+            container.innerHTML = products.map(product => `
+                <div class="product-item">
+                    <h3>${product.name}</h3>
+                    <p>${product.description}</p>
+                    <p><strong>Цена: ${product.price} руб.</strong></p>
+                    <button onclick="createOrder(${product.id})">Заказать</button>
+                </div>
+            `).join('');
+        }
+
+        function displayUserOrders(orders) {
+            const container = document.getElementById('user-orders');
+            container.innerHTML = orders.length ? 
+                orders.map(order => `
+                    <div class="order-item">
+                        <h3>Заказ #${order.id}</h3>
+                        <p>Товар: ${order.product_name}</p>
+                        <p>Статус: ${order.status}</p>
+                    </div>
+                `).join('') : 
+                "<p>Нет заказов.</p>";
+        }
+
+        function displayAllOrders(orders) {
+            const container = document.getElementById('admin-orders-list');
+            container.innerHTML = orders.length ? 
+                orders.map(order => `
+                    <div class="order-item">
+                        <h3>Заказ #${order.id}</h3>
+                        <p>Пользователь: ${order.user_name || order.user_id}</p>
+                        <p>Товар: ${order.product_name}</p>
+                        <p>Статус: ${order.status}</p>
+                        <button onclick="updateOrderStatus(${order.id}, 'completed')">Завершить</button>
+                        <button onclick="updateOrderStatus(${order.id}, 'cancelled')">Отменить</button>
+                    </div>
+                `).join('') : 
+                "<p>Нет заказов.</p>";
+        }
+
+        // Создание заказа
+        async function createOrder(productId) {
+            try {
+                const response = await fetch(`${BOT_API_URL}/create_order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: tgUser.id,
+                        product_id: productId
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert("Заказ создан!");
+                    await loadUserOrders();
+                    if (isAdmin) await loadAllOrders();
+                } else {
+                    alert("Ошибка: " + result.error);
+                }
+            } catch (error) {
+                alert("Ошибка создания заказа.");
+            }
+        }
+
+        // Обновление статуса заказа (админ)
+        async function updateOrderStatus(orderId, status) {
+            try {
+                const response = await fetch(`${BOT_API_URL}/update_order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        order_id: orderId,
+                        status: status
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    await loadUserOrders();
+                    await loadAllOrders();
+                } else {
+                    alert("Ошибка: " + result.error);
+                }
+            } catch (error) {
+                alert("Ошибка обновления заказа.");
+            }
+        }
+
+        // Показ экрана входа
+        function showLoginScreen() {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
